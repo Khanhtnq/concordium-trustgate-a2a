@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "concordium-trustgate-a2a"
+version = "1.0.0"
+description = "Concordium TrustGate A2A: Accountable Autonomous Agent Commerce & Compliance Gateway uniting CIS-8004, CIS-8, Web3Id ZK, x402 Micropayments, and EU AI Act Merkle Audits."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "TrustGate Architecture Team", email = "dev@trustgate.agency" }
+]
+keywords = [
+    "concordium",
+    "ai-agents",
+    "cis-8004",
+    "cis-8",
+    "web3id",
+    "zk-proofs",
+    "x402",
+    "eu-ai-act",
+    "merkle-tree",
+    "mcp"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Security :: Cryptography",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12"
+]
+
+[project.scripts]
+ccd-trustgate = "ccd_trustgate.cli:main"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = []
