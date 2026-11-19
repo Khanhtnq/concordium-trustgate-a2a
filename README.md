@@ -7,6 +7,7 @@ Accountable Autonomous Agent Commerce and Compliance Gateway uniting Concordium 
 Developed for **Encode Club — Concordium Trusted Agents Hackathon** (Challenge 390: *Make your Agents Accountable with Concordium*).
 
 - **Live Interactive Web Cockpit**: [https://khanhtnq.github.io/concordium-trustgate-a2a/](https://khanhtnq.github.io/concordium-trustgate-a2a/) *(1-click "Run Full 5-Vector Compliance Simulation" inside)*
+- **YouTube Demo Video (1080p Narrated)**: [https://youtu.be/gbqzxeZpOUs](https://youtu.be/gbqzxeZpOUs) ([Watch on YouTube](https://www.youtube.com/watch?v=gbqzxeZpOUs))
 - **1080p Demo Video (`40s`, `30fps`)**: [`assets/demo_1080p.mp4`](assets/demo_1080p.mp4) | [Hosted MP4](https://khanhtnq.github.io/concordium-trustgate-a2a/demo_1080p.mp4)
 - **Verification Status**: `31/31` passing unit & adversarial tests (`pytest` / `unittest`), `0` `ruff` warnings.
 
