@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import sys
+import time
 from typing import Any
 
 from .agent_card import (
@@ -193,6 +194,110 @@ def run_demo_flow(json_out: bool = False) -> dict[str, Any]:
     return report
 
 
+def run_benchmark(iterations: int = 200, json_out: bool = False) -> dict[str, Any]:
+    """Measure per-vector cryptographic latency across all 5 TrustGate compliance stages."""
+    if iterations < 1:
+        raise ValueError("iterations must be >= 1")
+
+    token_id = 42
+    contract_index = 10082
+    contract_subindex = 0
+    short_badge = encode_cis8004_badge(contract_index, contract_subindex, token_id)
+    ccd_account = "3y9m7R88888888888888888888888888888888888888"
+
+    t0 = time.perf_counter()
+    for _ in range(iterations):
+        decode_cis8004_badge(short_badge)
+        format_caip19(short_badge, "mainnet")
+    v1_ms = (time.perf_counter() - t0) * 1000.0 / iterations
+
+    agent_card = build_agent_card(
+        name="Concordium TrustGate Autonomous Auditor",
+        description="Enterprise autonomous compliance agent enforcing privacy-preserving zero-gas commerce.",
+        version="1.0.0",
+        image_uri="https://trustgate.agency/assets/agent.png",
+        services=[
+            {"name": "A2A", "endpoint": "https://agent.trustgate.agency/a2a", "version": "1.0.0"},
+            {"name": "MCP", "endpoint": "https://agent.trustgate.agency/mcp", "version": "2025-06-18"}
+        ],
+        token_id=token_id,
+        ccd_account=ccd_account,
+        network="mainnet"
+    )
+    metadata_hash = compute_agent_card_hash(agent_card)
+    on_chain_state = {"status": "Active", "metadata_hash": metadata_hash, "owner": ccd_account}
+
+    t0 = time.perf_counter()
+    for _ in range(iterations):
+        verify_agent_card(agent_card, on_chain_state)
+    v2_ms = (time.perf_counter() - t0) * 1000.0 / iterations
+
+    zk_secret = hashlib.sha256(b"CONCORDIUM_WEB3ID_SEED_SECRET").digest()
+    t0 = time.perf_counter()
+    for _ in range(iterations):
+        ch_map: dict[str, dict[str, Any]] = {}
+        ch = create_zk_challenge("A2A-CLIENT-NODE-01", ["age_over_18", "jurisdiction_allowed", "accredited_operator"])
+        ch_map[ch["challenge_id"]] = ch
+        proof = generate_zk_proof_response(
+            ch, ccd_account,
+            {"age_over_18": True, "country_code": "DK", "accredited_operator": True},
+            zk_secret
+        )
+        verify_zk_access_proof(proof, ch_map, expected_signer_secret=zk_secret)
+    v3_ms = (time.perf_counter() - t0) * 1000.0 / iterations
+
+    t0 = time.perf_counter()
+    for i in range(iterations):
+        x_map: dict[str, dict[str, Any]] = {}
+        c402 = generate_402_challenge(
+            "/v1/execute-audit", 250000,
+            "4B2H5j88888888888888888888888888888888888888",
+            "3SponsorRelayerAccount8888888888888888888888"
+        )
+        x_map[c402["challenge_nonce"]] = c402
+        payload = create_x402_payment_payload(c402, ccd_account, f"{i:064x}")
+        settle_x402_sponsored_payment(payload, x_map, set())
+    v4_ms = (time.perf_counter() - t0) * 1000.0 / iterations
+
+    ledger = AccountableExecutionLedger()
+    owner_caip10 = agent_card["extensions"]["concordiumBadge"]["ownerCaip10"]
+    t0 = time.perf_counter()
+    for i in range(iterations):
+        ledger.log_execution(short_badge, owner_caip10, "policy_hash", "receipt_hash", "input", "output")
+        cert = ledger.generate_audit_certificate(i)
+        AccountableExecutionLedger.verify_audit_certificate(cert)
+    v5_ms = (time.perf_counter() - t0) * 1000.0 / iterations
+
+    total_ms = v1_ms + v2_ms + v3_ms + v4_ms + v5_ms
+    result = {
+        "iterations": iterations,
+        "vectors": {
+            "cis8004_badge_resolution_ms": round(v1_ms, 4),
+            "erc8004_a2a_card_verify_ms": round(v2_ms, 4),
+            "web3id_zk_policy_gate_ms": round(v3_ms, 4),
+            "x402_0gas_settlement_ms": round(v4_ms, 4),
+            "eu_ai_act_rfc6962_merkle_ms": round(v5_ms, 4),
+        },
+        "total_pipeline_ms": round(total_ms, 4),
+        "throughput_tx_per_sec": round(1000.0 / total_ms, 1) if total_ms > 0 else 0.0,
+    }
+
+    if json_out:
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"Concordium TrustGate A2A Benchmark ({iterations} iterations/vector)")
+        print(f"  1. CIS-8004 Badge + CAIP-19 Resolution : {result['vectors']['cis8004_badge_resolution_ms']:.4f} ms")
+        print(f"  2. ERC-8004 + A2A Card Integrity       : {result['vectors']['erc8004_a2a_card_verify_ms']:.4f} ms")
+        print(f"  3. Web3Id ZK Policy Gate (0-PII)       : {result['vectors']['web3id_zk_policy_gate_ms']:.4f} ms")
+        print(f"  4. x402 0-Gas microCCD Settlement      : {result['vectors']['x402_0gas_settlement_ms']:.4f} ms")
+        print(f"  5. EU AI Act Art. 12 RFC-6962 Receipt  : {result['vectors']['eu_ai_act_rfc6962_merkle_ms']:.4f} ms")
+        print(
+            f"  Total End-to-End 5-Vector Latency      : "
+            f"{result['total_pipeline_ms']:.4f} ms ({result['throughput_tx_per_sec']} tx/s)"
+        )
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description="Concordium TrustGate A2A CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
@@ -214,6 +319,11 @@ def main():
 
     # mcp-tools
     subparsers.add_parser("mcp-tools", help="List registered Model Context Protocol tools")
+
+    # benchmark
+    bench_parser = subparsers.add_parser("benchmark", help="Measure 5-vector latency benchmarks")
+    bench_parser.add_argument("--iterations", type=int, default=200, help="Iterations per vector")
+    bench_parser.add_argument("--json-out", action="store_true", help="Print structured JSON output")
 
     args = parser.parse_args()
 
@@ -250,6 +360,9 @@ def main():
         handler = MCPTrustGateHandler()
         tools = handler.list_tools()
         print(json.dumps(tools, indent=2))
+
+    elif args.command == "benchmark":
+        run_benchmark(iterations=args.iterations, json_out=getattr(args, "json_out", False))
 
     else:
         parser.print_help()

@@ -28,7 +28,7 @@ from ccd_trustgate.badge import (
     format_caip19,
     parse_caip19,
 )
-from ccd_trustgate.cli import run_demo_flow
+from ccd_trustgate.cli import run_benchmark, run_demo_flow
 from ccd_trustgate.mcp_server import MCPTrustGateHandler
 from ccd_trustgate.x402_rail import (
     create_x402_payment_payload,
@@ -536,6 +536,24 @@ class TestConcordiumTrustGate(unittest.TestCase):
         pay["user_gas_fee"] = False
         settled = settle_x402_sponsored_payment(pay, x_challenges, set())
         self.assertFalse(settled["settled"])
+
+    def test_31_cli_benchmark_execution(self):
+        """CLI benchmark must return positive sub-millisecond/low-ms metrics for all 5 vectors."""
+        res = run_benchmark(iterations=20, json_out=False)
+        self.assertEqual(res["iterations"], 20)
+        self.assertGreater(res["throughput_tx_per_sec"], 0.0)
+        vectors = res["vectors"]
+        for key in (
+            "cis8004_badge_resolution_ms",
+            "erc8004_a2a_card_verify_ms",
+            "web3id_zk_policy_gate_ms",
+            "x402_0gas_settlement_ms",
+            "eu_ai_act_rfc6962_merkle_ms",
+        ):
+            self.assertIn(key, vectors)
+            self.assertGreater(vectors[key], 0.0)
+        with self.assertRaises(ValueError):
+            run_benchmark(iterations=0)
 
 
 if __name__ == "__main__":
